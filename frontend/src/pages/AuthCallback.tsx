@@ -9,9 +9,9 @@ export default function AuthCallback() {
     const token = params.get('token');
     if (token) {
       localStorage.setItem('token', token);
-      navigate('/', { replace: true });
+      window.location.replace('/');
     } else {
-      navigate('/login', { replace: true });
+      window.location.replace('/login');
     }
   }, []);
 
