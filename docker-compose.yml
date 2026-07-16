@@ -1,0 +1,19 @@
+services:
+  openapi-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: openapi
+      POSTGRES_PASSWORD: openapi
+      POSTGRES_DB: openapi
+    ports:
+      - "5433:5432"
+    volumes:
+      - openapi_db_data:/var/lib/postgresql/data
+
+  openapi-redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+
+volumes:
+  openapi_db_data:

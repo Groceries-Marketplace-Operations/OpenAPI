@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../backend/node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  viewer
+}
+
+model Account {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  picture   String?
+  roles     Role[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("account")
+}
+
+model Project {
+  id          String           @id @default(uuid())
+  name        String
+  slug        String           @unique
+  description String?
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  diDiConfig  DiDiConfig?
+  orderEvents DiDiOrderEvent[]
+  @@map("project")
+}
+
+model DiDiConfig {
+  id        String   @id @default(uuid())
+  projectId String   @unique @map("project_id")
+  appId     String   @map("app_id")
+  appSecret String   @map("app_secret")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@map("didi_config")
+}
+
+model DiDiOrderEvent {
+  id           String   @id @default(uuid())
+  projectId    String   @map("project_id")
+  appShopId    String   @map("app_shop_id")
+  orderId      String   @map("order_id")
+  orderIndex   Int      @map("order_index")
+  date         String
+  timestamp    BigInt
+  confirmed    Boolean  @default(false)
+  confirmError String?  @map("confirm_error")
+  createdAt    DateTime @default(now()) @map("created_at")
+  project      Project  @relation(fields: [projectId], references: [id])
+  @@unique([projectId, appShopId, date, orderIndex])
+  @@map("didi_order_event")
+}

@@ -1,0 +1,32 @@
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ProjectsService } from './projects.service';
+import { UpsertProjectDto } from './dto/upsert-project.dto';
+import { UpsertDiDiConfigDto } from './dto/upsert-didi-config.dto';
+
+@Controller('projects')
+export class ProjectsController {
+  constructor(private service: ProjectsService) {}
+
+  @Get()
+  findAll() { return this.service.findAll(); }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) { return this.service.findOne(id); }
+
+  @Post()
+  @Roles('admin')
+  create(@Body() dto: UpsertProjectDto) { return this.service.create(dto); }
+
+  @Patch(':id')
+  @Roles('admin')
+  update(@Param('id') id: string, @Body() dto: UpsertProjectDto) {
+    return this.service.update(id, dto);
+  }
+
+  @Post(':id/didi-config')
+  @Roles('admin')
+  upsertDiDiConfig(@Param('id') id: string, @Body() dto: UpsertDiDiConfigDto) {
+    return this.service.upsertDiDiConfig(id, dto);
+  }
+}
