@@ -3,7 +3,8 @@ WORKDIR /app
 COPY backend/package*.json ./
 RUN npm ci
 COPY backend/ ./
-COPY prisma/ ../prisma/
+COPY prisma/ ./prisma/
+RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npm run build
 
 FROM node:20-alpine
