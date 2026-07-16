@@ -6,11 +6,11 @@ build:
 deploy: deploy-backend deploy-frontend
 
 deploy-backend:
-	$(DC) build backend
+	$(DC) build openapi-backend
 	$(DC) up -d openapi-db openapi-backend
 
 deploy-frontend:
-	$(DC) build frontend
+	$(DC) build openapi-frontend
 	$(DC) up -d openapi-frontend
 
 migrate:
