@@ -1,14 +1,14 @@
-import crypto from 'crypto';
+import { createHash, createHmac } from 'crypto';
 
 export const DIDI_BASE = 'https://openapi.didi-food.com/v1';
 
 export function verifyWebhookSignature(rawBody: string, signature: string, appSecret: string): boolean {
-  const md5 = crypto.createHash('md5').update(rawBody + appSecret).digest('hex');
+  const md5 = createHash('md5').update(rawBody + appSecret).digest('hex');
   return md5 === signature;
 }
 
 export function verifyQuerySignature(appId: string, timestamp: string, signature: string, appSecret: string): boolean {
-  const expected = crypto.createHmac('sha256', appSecret).update(`${appId}:${timestamp}`).digest('hex');
+  const expected = createHmac('sha256', appSecret).update(`${appId}:${timestamp}`).digest('hex');
   return expected === signature;
 }
 
