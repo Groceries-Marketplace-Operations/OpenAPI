@@ -42,11 +42,14 @@ export class DiDiFoodService {
     const orderInfo = body?.data?.order_info;
     if (!orderInfo || !app_shop_id || !timestamp) throw new BadRequestException('Missing fields');
 
-    // Extract order_id without precision loss
+    // Extract order_id without precision loss (search after "order_info" key)
     const sourceStr = payload.PARAM
       ? (typeof payload.PARAM === 'string' ? payload.PARAM : JSON.stringify(payload.PARAM))
       : rawBody;
-    const orderIdMatch = sourceStr.match(/"order_info"\s*:\s*\{[^}]*?"order_id"\s*:\s*(\d+)/);
+    const orderInfoPos = sourceStr.indexOf('"order_info"');
+    const orderIdMatch = orderInfoPos !== -1
+      ? sourceStr.slice(orderInfoPos).match(/"order_id"\s*:\s*(\d+)/)
+      : null;
     const orderId = orderIdMatch ? orderIdMatch[1] : String(orderInfo.order_id);
     const orderIndex = orderInfo.order_index as number;
 
