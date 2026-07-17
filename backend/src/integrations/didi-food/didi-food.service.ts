@@ -1,4 +1,5 @@
-import { Injectable, Logger, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { randomInt } from 'crypto';
+import { Injectable, Logger, UnauthorizedException, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ProjectsService } from '../../projects/projects.service';
 import {
@@ -84,6 +85,39 @@ export class DiDiFoodService {
         data: { confirmed: false, confirmError: msg },
       });
     }
+  }
+
+  async createTestOrder(slug: string, appShopId: string, orderIndex: number, date?: string) {
+    const project = await this.prisma.project.findUnique({ where: { slug } });
+    if (!project?.active) throw new NotFoundException('Project not found');
+
+    const cfg = await this.projects.getDiDiConfig(project.id);
+    if (!cfg) throw new NotFoundException('DiDi config not set');
+    if (!cfg.testModeEnabled) throw new ForbiddenException('Test mode is disabled for this project');
+    if (!cfg.testShops.includes(appShopId)) {
+      throw new ForbiddenException(`Shop ${appShopId} is not in the allowed test shops list`);
+    }
+
+    const PREFIX = '576467';
+    const TOTAL_LENGTH = 19;
+    let suffix = '';
+    while (suffix.length < TOTAL_LENGTH - PREFIX.length) suffix += randomInt(0, 10).toString();
+    const orderId = PREFIX + suffix;
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const targetDate = date ?? new Date(timestamp * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+
+    try {
+      await this.prisma.diDiOrderEvent.create({
+        data: { projectId: project.id, appShopId, orderId, orderIndex, date: targetDate, timestamp: BigInt(timestamp), confirmed: true },
+      });
+    } catch (err: any) {
+      if (err.code === 'P2002') throw new ConflictException('An order with this shop/date/order_index already exists');
+      throw err;
+    }
+
+    this.logger.log(`Test order created: ${orderId} index ${orderIndex} shop ${appShopId}`);
+    return { success: true, orderId, orderIndex, appShopId, date: targetDate, timestamp };
   }
 
   async queryOrder(slug: string, headers: Record<string, string>, appShopId: string, orderIndex: number, date?: string) {

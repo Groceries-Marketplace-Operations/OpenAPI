@@ -1,7 +1,15 @@
-import { Controller, Get, Headers, Param, Post, Query, RawBodyRequest, Req, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query, RawBodyRequest, Req, UnauthorizedException } from '@nestjs/common';
+import { IsNumber, IsOptional, IsString } from 'class-validator';
 import { Request } from 'express';
 import { Public } from '../../auth/decorators/public.decorator';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { DiDiFoodService } from './didi-food.service';
+
+class CreateTestOrderDto {
+  @IsString() appShopId: string;
+  @IsNumber() orderIndex: number;
+  @IsOptional() @IsString() date?: string;
+}
 
 @Controller()
 export class DiDiFoodController {
@@ -17,6 +25,12 @@ export class DiDiFoodController {
     if (!signature) throw new UnauthorizedException('Missing signature');
     const rawBody = req.rawBody?.toString('utf8') ?? JSON.stringify(req.body);
     return this.service.handleWebhook(slug, rawBody, signature);
+  }
+
+  @Post('didi/:slug/test-orders')
+  @Roles('admin')
+  createTestOrder(@Param('slug') slug: string, @Body() dto: CreateTestOrderDto) {
+    return this.service.createTestOrder(slug, dto.appShopId, dto.orderIndex, dto.date);
   }
 
   @Public()

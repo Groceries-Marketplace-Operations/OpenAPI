@@ -11,7 +11,7 @@ export interface Project {
   description: string | null;
   active: boolean;
   createdAt: string;
-  diDiConfig: { id: string; appId: string; updatedAt: string } | null;
+  diDiConfig: { id: string; appId: string; testModeEnabled: boolean; testShops: string[]; updatedAt: string } | null;
 }
 
 export interface DiDiOrderEvent {

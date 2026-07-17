@@ -24,7 +24,7 @@ export class ProjectsService {
     return this.prisma.project.findUnique({
       where: { id },
       include: {
-        diDiConfig: { select: { id: true, appId: true, updatedAt: true } },
+        diDiConfig: { select: { id: true, appId: true, testModeEnabled: true, testShops: true, updatedAt: true } },
         orderEvents: { orderBy: { createdAt: 'desc' }, take: 100 },
       },
     });
@@ -40,10 +40,21 @@ export class ProjectsService {
 
   async upsertDiDiConfig(projectId: string, dto: UpsertDiDiConfigDto) {
     const appSecret = this.encKey ? encrypt(dto.appSecret, this.encKey) : dto.appSecret;
+    const extra = {
+      testModeEnabled: dto.testModeEnabled ?? false,
+      testShops: dto.testShops ?? [],
+    };
     return this.prisma.diDiConfig.upsert({
       where: { projectId },
-      create: { projectId, appId: dto.appId, appSecret },
-      update: { appId: dto.appId, appSecret },
+      create: { projectId, appId: dto.appId, appSecret, ...extra },
+      update: { appId: dto.appId, appSecret, ...extra },
+    });
+  }
+
+  async updateTestMode(projectId: string, testModeEnabled: boolean, testShops: string[]) {
+    return this.prisma.diDiConfig.update({
+      where: { projectId },
+      data: { testModeEnabled, testShops },
     });
   }
 

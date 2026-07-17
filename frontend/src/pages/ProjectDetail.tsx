@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
-import { projectsApi } from '../api';
+import { projectsApi, diDiApi } from '../api';
 import type { ProjectDetail as PD } from '../types';
 
 export default function ProjectDetail() {
@@ -14,7 +14,25 @@ export default function ProjectDetail() {
   const [cfg, setCfg] = useState({ appId: '', appSecret: '' });
   const [saving, setSaving] = useState(false);
 
+  const [showTestPanel, setShowTestPanel] = useState(false);
+  const [testEnabled, setTestEnabled] = useState(false);
+  const [testShops, setTestShops] = useState<string[]>([]);
+  const [newShop, setNewShop] = useState('');
+  const [savingTest, setSavingTest] = useState(false);
+  const [testOrder, setTestOrder] = useState({ appShopId: '', orderIndex: '' });
+  const [testResult, setTestResult] = useState<any>(null);
+  const [testError, setTestError] = useState('');
+  const [submittingOrder, setSubmittingOrder] = useState(false);
+
   const isAdmin = user?.roles?.includes('admin');
+
+  const openTestPanel = () => {
+    setTestEnabled(project?.diDiConfig?.testModeEnabled ?? false);
+    setTestShops(project?.diDiConfig?.testShops ?? []);
+    setTestResult(null);
+    setTestError('');
+    setShowTestPanel(true);
+  };
 
   const saveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +43,36 @@ export default function ProjectDetail() {
       setShowConfig(false);
       setCfg({ appId: '', appSecret: '' });
     } finally { setSaving(false); }
+  };
+
+  const saveTestMode = async () => {
+    setSavingTest(true);
+    try {
+      await projectsApi.updateTestMode(id!, testEnabled, testShops);
+      qc.invalidateQueries({ queryKey: ['project', id] });
+    } finally { setSavingTest(false); }
+  };
+
+  const addShop = () => {
+    const v = newShop.trim();
+    if (v && !testShops.includes(v)) setTestShops(p => [...p, v]);
+    setNewShop('');
+  };
+
+  const submitTestOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTestResult(null);
+    setTestError('');
+    setSubmittingOrder(true);
+    try {
+      const res = await diDiApi.createTestOrder(project!.slug, {
+        appShopId: testOrder.appShopId,
+        orderIndex: Number(testOrder.orderIndex),
+      });
+      setTestResult(res);
+    } catch (err: any) {
+      setTestError(err?.response?.data?.message ?? err.message ?? 'Error');
+    } finally { setSubmittingOrder(false); }
   };
 
   if (!project) return <div style={{ padding: 32 }}>Loading…</div>;
@@ -44,9 +92,14 @@ export default function ProjectDetail() {
           {project.description && <div style={{ color: '#555', fontSize: 14, marginTop: 4 }}>{project.description}</div>}
         </div>
         {isAdmin && (
-          <button onClick={() => setShowConfig(v => !v)} style={btnStyle}>
-            {project.diDiConfig ? 'Edit DiDi Config' : 'Set DiDi Config'}
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={openTestPanel} style={ghostBtn}>
+              Test Mode {project.diDiConfig?.testModeEnabled ? '🟢' : '⚪'}
+            </button>
+            <button onClick={() => setShowConfig(v => !v)} style={btnStyle}>
+              {project.diDiConfig ? 'Edit DiDi Config' : 'Set DiDi Config'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -63,6 +116,105 @@ export default function ProjectDetail() {
             <button type="button" onClick={() => setShowConfig(false)} style={ghostBtn}>Cancel</button>
           </div>
         </form>
+      )}
+
+      {/* Test mode panel */}
+      {showTestPanel && (
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h3 style={{ margin: 0 }}>Test Mode</h3>
+            <button onClick={() => setShowTestPanel(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#888' }}>✕</button>
+          </div>
+
+          {/* Toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+            <div
+              onClick={() => setTestEnabled(v => !v)}
+              style={{
+                width: 44, height: 24, borderRadius: 12,
+                background: testEnabled ? '#FF6B00' : '#ddd',
+                position: 'relative', cursor: 'pointer', transition: 'background .2s', flexShrink: 0,
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 3, left: testEnabled ? 23 : 3, width: 18, height: 18,
+                borderRadius: '50%', background: '#fff', transition: 'left .2s',
+              }} />
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>{testEnabled ? 'Enabled' : 'Disabled'}</span>
+          </div>
+
+          {/* Test shops */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 8 }}>Allowed Test Shops</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              {testShops.map(s => (
+                <span key={s} style={{ background: '#f0f0f0', padding: '4px 10px', borderRadius: 20, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {s}
+                  <button onClick={() => setTestShops(p => p.filter(x => x !== s))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
+                </span>
+              ))}
+              {testShops.length === 0 && <span style={{ color: '#aaa', fontSize: 13 }}>No shops added</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                placeholder="Shop ID (e.g. 1111)"
+                value={newShop}
+                onChange={e => setNewShop(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addShop())}
+                style={{ ...inputStyle, flex: 1, width: 'auto' }}
+              />
+              <button type="button" onClick={addShop} style={ghostBtn}>Add</button>
+            </div>
+          </div>
+
+          <button onClick={saveTestMode} disabled={savingTest} style={btnStyle}>
+            {savingTest ? 'Saving…' : 'Save'}
+          </button>
+
+          {/* Create test order */}
+          {testEnabled && testShops.length > 0 && (
+            <div style={{ marginTop: 24, borderTop: '1px solid #eee', paddingTop: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 12 }}>Create Test Order</div>
+              <form onSubmit={submitTestOrder} style={{ display: 'grid', gap: 10 }}>
+                <select
+                  required
+                  value={testOrder.appShopId}
+                  onChange={e => setTestOrder(p => ({ ...p, appShopId: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="">Select shop…</option>
+                  {testShops.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <input
+                  type="number"
+                  placeholder="Order Index"
+                  required
+                  min={1}
+                  value={testOrder.orderIndex}
+                  onChange={e => setTestOrder(p => ({ ...p, orderIndex: e.target.value }))}
+                  style={inputStyle}
+                />
+                <button type="submit" disabled={submittingOrder} style={{ ...btnStyle, background: '#1976d2' }}>
+                  {submittingOrder ? 'Creating…' : 'Create Test Order'}
+                </button>
+              </form>
+
+              {testResult && (
+                <div style={{ marginTop: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '12px 16px', fontSize: 13 }}>
+                  <div style={{ fontWeight: 600, color: '#166534', marginBottom: 6 }}>✓ Order created</div>
+                  <div><b>Order ID:</b> <code style={{ fontFamily: 'monospace' }}>{testResult.orderId}</code></div>
+                  <div style={{ marginTop: 4 }}><b>Shop:</b> {testResult.appShopId} &nbsp;·&nbsp; <b>Index:</b> {testResult.orderIndex} &nbsp;·&nbsp; <b>Date:</b> {testResult.date}</div>
+                </div>
+              )}
+              {testError && (
+                <div style={{ marginTop: 12, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: '#991b1b' }}>
+                  {testError}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Endpoints */}

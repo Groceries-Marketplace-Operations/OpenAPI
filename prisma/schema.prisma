@@ -38,13 +38,15 @@ model Project {
 }
 
 model DiDiConfig {
-  id        String   @id @default(uuid())
-  projectId String   @unique @map("project_id")
-  appId     String   @map("app_id")
-  appSecret String   @map("app_secret")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
+  projectId       String   @unique @map("project_id")
+  appId           String   @map("app_id")
+  appSecret       String   @map("app_secret")
+  testModeEnabled Boolean  @default(false) @map("test_mode_enabled")
+  testShops       String[] @map("test_shops")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   @@map("didi_config")
 }
 
