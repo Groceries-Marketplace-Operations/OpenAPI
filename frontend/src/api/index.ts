@@ -19,6 +19,14 @@ export const diDiApi = {
     client.post(`/didi/${slug}/test-orders`, data).then(r => r.data),
 };
 
+export const groceryApi = {
+  getConfig: (slug: string) => client.get(`/didi/${slug}/grocery/config`).then(r => r.data),
+  upsertConfig: (slug: string, data: any) => client.post(`/didi/${slug}/grocery/config`, data).then(r => r.data),
+  trigger: (slug: string, mode: 'menu' | 'stock') => client.post(`/didi/${slug}/grocery/trigger`, { mode }).then(r => r.data),
+  listUploads: (slug: string) => client.get(`/didi/${slug}/grocery/uploads`).then(r => r.data),
+  checkTasks: (slug: string, uploadId: string) => client.post(`/didi/${slug}/grocery/uploads/${uploadId}/check-tasks`, {}).then(r => r.data),
+};
+
 export const accountsApi = {
   list: () => client.get('/accounts').then(r => r.data),
   setRole: (id: string, roles: string[]) => client.patch(`/accounts/${id}/roles`, { roles }).then(r => r.data),

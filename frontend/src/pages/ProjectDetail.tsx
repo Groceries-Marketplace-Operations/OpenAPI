@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { projectsApi, diDiApi } from '../api';
+import GroceryPanel from './GroceryPanel';
 import type { ProjectDetail as PD } from '../types';
 
 export default function ProjectDetail() {
@@ -14,6 +15,7 @@ export default function ProjectDetail() {
   const [cfg, setCfg] = useState({ appId: '', appSecret: '' });
   const [saving, setSaving] = useState(false);
 
+  const [showGrocery, setShowGrocery] = useState(false);
   const [showTestPanel, setShowTestPanel] = useState(false);
   const [testEnabled, setTestEnabled] = useState(false);
   const [testShops, setTestShops] = useState<string[]>([]);
@@ -93,6 +95,9 @@ export default function ProjectDetail() {
         </div>
         {isAdmin && (
           <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setShowGrocery(v => !v)} style={ghostBtn}>
+              Grocery
+            </button>
             <button onClick={openTestPanel} style={ghostBtn}>
               Test Mode {project.diDiConfig?.testModeEnabled ? '🟢' : '⚪'}
             </button>
@@ -215,6 +220,11 @@ export default function ProjectDetail() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Grocery panel */}
+      {showGrocery && project.slug && (
+        <GroceryPanel slug={project.slug} onClose={() => setShowGrocery(false)} />
       )}
 
       {/* Endpoints */}

@@ -25,15 +25,17 @@ model Account {
 }
 
 model Project {
-  id          String           @id @default(uuid())
-  name        String
-  slug        String           @unique
-  description String?
-  active      Boolean          @default(true)
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
-  diDiConfig  DiDiConfig?
-  orderEvents DiDiOrderEvent[]
+  id             String              @id @default(uuid())
+  name           String
+  slug           String              @unique
+  description    String?
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  diDiConfig     DiDiConfig?
+  groceryConfig  DiDiGroceryConfig?
+  orderEvents    DiDiOrderEvent[]
+  groceryUploads DiDiGroceryUpload[]
   @@map("project")
 }
 
@@ -48,6 +50,51 @@ model DiDiConfig {
   updatedAt       DateTime @updatedAt @map("updated_at")
   project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   @@map("didi_config")
+}
+
+model DiDiGroceryConfig {
+  id               String    @id @default(uuid())
+  projectId        String    @unique @map("project_id")
+  sftpHost         String    @map("sftp_host")
+  sftpPort         Int       @default(36000) @map("sftp_port")
+  sftpUser         String    @map("sftp_user")
+  sftpPassword     String    @map("sftp_password")
+  sftpRemoteDir    String    @default("/upload") @map("sftp_remote_dir")
+  maxPerCategory   Int       @default(3000) @map("max_per_category")
+  scheduleEnabled  Boolean   @default(false) @map("schedule_enabled")
+  scheduleHour     Int       @default(9) @map("schedule_hour")
+  scheduleMinute   Int       @default(0) @map("schedule_minute")
+  scheduleTimezone String    @default("America/Bogota") @map("schedule_timezone")
+  lastRunAt        DateTime? @map("last_run_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  project          Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@map("didi_grocery_config")
+}
+
+model DiDiGroceryUpload {
+  id        String                  @id @default(uuid())
+  projectId String                  @map("project_id")
+  filename  String
+  mode      String                  @default("menu")
+  status    String                  @default("running")
+  createdAt DateTime                @default(now()) @map("created_at")
+  updatedAt DateTime                @updatedAt @map("updated_at")
+  project   Project                 @relation(fields: [projectId], references: [id])
+  stores    DiDiGroceryUploadStore[]
+  @@map("didi_grocery_upload")
+}
+
+model DiDiGroceryUploadStore {
+  id           String            @id @default(uuid())
+  uploadId     String            @map("upload_id")
+  appShopId    String            @map("app_shop_id")
+  taskId       String?           @map("task_id")
+  status       String            @default("pending")
+  errorMessage String?           @map("error_message")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  upload       DiDiGroceryUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  @@map("didi_grocery_upload_store")
 }
 
 model DiDiOrderEvent {
