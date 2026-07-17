@@ -172,8 +172,8 @@ export default function ProjectDetail() {
             {savingTest ? 'Saving…' : 'Save'}
           </button>
 
-          {/* Create test order */}
-          {testEnabled && testShops.length > 0 && (
+          {/* Create test order — only when DB already has testModeEnabled=true */}
+          {project.diDiConfig?.testModeEnabled && project.diDiConfig.testShops.length > 0 && (
             <div style={{ marginTop: 24, borderTop: '1px solid #eee', paddingTop: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 12 }}>Create Test Order</div>
               <form onSubmit={submitTestOrder} style={{ display: 'grid', gap: 10 }}>
@@ -184,7 +184,7 @@ export default function ProjectDetail() {
                   style={inputStyle}
                 >
                   <option value="">Select shop…</option>
-                  {testShops.map(s => <option key={s} value={s}>{s}</option>)}
+                  {project.diDiConfig!.testShops.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 <input
                   type="number"
