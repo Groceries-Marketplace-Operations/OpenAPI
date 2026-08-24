@@ -11,6 +11,11 @@ class CreateTestOrderDto {
   @IsOptional() @IsString() date?: string;
 }
 
+class CreatePublicTestOrderDto {
+  @IsString() app_shop_id: string;
+  @IsNumber() order_index: number;
+}
+
 @Controller()
 export class DiDiFoodController {
   constructor(private service: DiDiFoodService) {}
@@ -31,6 +36,12 @@ export class DiDiFoodController {
   @Roles('admin')
   createTestOrder(@Param('slug') slug: string, @Body() dto: CreateTestOrderDto) {
     return this.service.createTestOrder(slug, dto.appShopId, dto.orderIndex, dto.date);
+  }
+
+  @Public()
+  @Post('didi/:slug/orders')
+  createPublicTestOrder(@Param('slug') slug: string, @Body() dto: CreatePublicTestOrderDto) {
+    return this.service.createTestOrder(slug, dto.app_shop_id, dto.order_index);
   }
 
   @Public()
