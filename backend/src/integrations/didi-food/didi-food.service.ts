@@ -150,10 +150,13 @@ export class DiDiFoodService {
     if (!event) throw new NotFoundException(`Order not found for shop ${appShopId} index ${orderIndex} on ${targetDate}`);
 
     return {
-      order_id: event.orderId,
-      order_index: event.orderIndex,
-      app_shop_id: event.appShopId,
-      date: targetDate,
+      success: true,
+      data: {
+        order_id: event.orderId,
+        order_index: String(event.orderIndex),
+        app_shop_id: event.appShopId,
+        date: targetDate,
+      },
     };
   }
 }
