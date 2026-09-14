@@ -6,7 +6,13 @@ import {
   InventoryRecordDto,
   ReceiveInventoryDto,
 } from './dto/receive-inventory.dto';
-import { NinetyNineFoodClient, NinetyNineGroceryItem } from './ninety-nine-food.client';
+import {
+  NinetyNineFoodClient,
+  NinetyNineGroceryCategory,
+  NinetyNineGroceryItem,
+} from './ninety-nine-food.client';
+
+const MAX_ITEMS_PER_CATEGORY = 3_000;
 
 export interface InventoryReceipt {
   job_id: string;
@@ -32,14 +38,16 @@ export class InventoryService {
       this.validateStoreRecords(storeId, records);
 
       const authToken = await this.ninetyNineFood.getAuthToken(storeId);
+      const items = records.map(record => this.toNinetyNineItem(record));
+      const categories = this.buildCategories(items);
       const taskId = await this.ninetyNineFood.uploadGrocery(authToken, storeId, {
         menus: [{
           app_menu_id: `menu_${storeId}`,
           menu_name: 'Main catalogue',
-          app_category_ids: [],
+          app_category_ids: categories.map(category => category.app_category_id),
         }],
-        categories: [],
-        items: records.map(record => this.toNinetyNineItem(record)),
+        categories,
+        items,
         merge_policy: payload.type === InventoryLoadType.FULL ? 1 : 0,
       });
 
@@ -118,6 +126,22 @@ export class InventoryService {
     }
 
     return item;
+  }
+
+  private buildCategories(items: NinetyNineGroceryItem[]): NinetyNineGroceryCategory[] {
+    const categories: NinetyNineGroceryCategory[] = [];
+
+    for (let offset = 0; offset < items.length; offset += MAX_ITEMS_PER_CATEGORY) {
+      categories.push({
+        app_category_id: String(categories.length + 1),
+        category_name: 'Despensa',
+        app_item_ids: items
+          .slice(offset, offset + MAX_ITEMS_PER_CATEGORY)
+          .map(item => item.app_item_id),
+      });
+    }
+
+    return categories;
   }
 
   private toMinorUnits(value: number, itemId: string): number {

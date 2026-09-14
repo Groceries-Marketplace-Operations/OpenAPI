@@ -20,13 +20,19 @@ export interface NinetyNineGroceryItem {
   item_tags: number[];
 }
 
+export interface NinetyNineGroceryCategory {
+  app_category_id: string;
+  category_name: 'Despensa';
+  app_item_ids: string[];
+}
+
 export interface NinetyNineGroceryPayload {
   menus: Array<{
     app_menu_id: string;
     menu_name: string;
     app_category_ids: string[];
   }>;
-  categories: unknown[];
+  categories: NinetyNineGroceryCategory[];
   items: NinetyNineGroceryItem[];
   merge_policy: 0 | 1;
 }
