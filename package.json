@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "test:inventory": "node scripts/test-inventory-scenarios.mjs"
+  },
   "devDependencies": {
     "prisma": "^5.22.0"
   },

@@ -4,11 +4,19 @@ import LoginPage from './pages/LoginPage';
 import AuthCallback from './pages/AuthCallback';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetail from './pages/ProjectDetail';
+import InventoryActivityPage from './pages/InventoryActivityPage';
 
-function Protected({ children }: { children: JSX.Element }) {
+function Protected({
+  children,
+  adminOnly = false,
+}: {
+  children: JSX.Element;
+  adminOnly?: boolean;
+}) {
   const { user, loading } = useAuth();
   if (loading) return <div style={{ padding: 32 }}>Loading…</div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (adminOnly && !user.roles?.includes('admin')) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -19,6 +27,7 @@ export default function App() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/" element={<Protected><ProjectsPage /></Protected>} />
       <Route path="/projects/:id" element={<Protected><ProjectDetail /></Protected>} />
+      <Route path="/inventory-activity" element={<Protected adminOnly><InventoryActivityPage /></Protected>} />
     </Routes>
   );
 }

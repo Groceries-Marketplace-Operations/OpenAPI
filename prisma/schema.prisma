@@ -112,3 +112,60 @@ model DiDiOrderEvent {
   @@unique([projectId, appShopId, date, orderIndex])
   @@map("didi_order_event")
 }
+
+model InventoryRequestLog {
+  id              String                 @id
+  loadType        String?                @map("load_type")
+  method          String
+  path            String
+  sourceIp        String?                @map("source_ip")
+  userAgent       String?                @map("user_agent")
+  requestHeaders  Json                   @map("request_headers")
+  requestBody     Json?                  @map("request_body")
+  requestRawBody  String?                @map("request_raw_body")
+  responseStatus  Int?                   @map("response_status")
+  responseHeaders Json?                  @map("response_headers")
+  responseBody    Json?                  @map("response_body")
+  responseRawBody String?                @map("response_raw_body")
+  success         Boolean?
+  errorMessage    String?                @map("error_message")
+  recordCount     Int?                   @map("record_count")
+  storeIds        String[]               @default([]) @map("store_ids")
+  durationMs      Int?                   @map("duration_ms")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  completedAt     DateTime?              @map("completed_at")
+  upstreamCalls   InventoryUpstreamLog[]
+
+  @@index([createdAt])
+  @@index([loadType, createdAt])
+  @@index([success, createdAt])
+  @@index([storeIds], type: Gin)
+  @@map("inventory_request_log")
+}
+
+model InventoryUpstreamLog {
+  id              String              @id @default(uuid())
+  requestId       String              @map("request_id")
+  sequence        Int
+  operation       String
+  storeId         String?             @map("store_id")
+  taskId          String?             @map("task_id")
+  method          String
+  url             String
+  requestHeaders  Json?               @map("request_headers")
+  requestBody     Json?               @map("request_body")
+  responseStatus  Int?                @map("response_status")
+  responseHeaders Json?               @map("response_headers")
+  responseBody    Json?               @map("response_body")
+  responseRawBody String?              @map("response_raw_body")
+  success         Boolean
+  errorMessage    String?             @map("error_message")
+  durationMs      Int                 @map("duration_ms")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  request         InventoryRequestLog @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, sequence])
+  @@index([operation, createdAt])
+  @@index([storeId, createdAt])
+  @@map("inventory_upstream_log")
+}

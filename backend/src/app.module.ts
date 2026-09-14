@@ -6,6 +6,7 @@ import { AccountsModule } from './accounts/accounts.module';
 import { ProjectsModule } from './projects/projects.module';
 import { DiDiFoodModule } from './integrations/didi-food/didi-food.module';
 import { DiDiGroceryModule } from './integrations/didi-grocery/didi-grocery.module';
+import { InventoryModule } from './integrations/inventory/inventory.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { DiDiGroceryModule } from './integrations/didi-grocery/didi-grocery.modu
     ProjectsModule,
     DiDiFoodModule,
     DiDiGroceryModule,
+    InventoryModule,
   ],
 })
 export class AppModule {}

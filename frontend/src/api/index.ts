@@ -1,4 +1,5 @@
 import client from './client';
+import type { InventoryActivityFilters } from '../types';
 
 export const authApi = {
   me: () => client.get('/auth/me').then(r => r.data),
@@ -25,6 +26,13 @@ export const groceryApi = {
   trigger: (slug: string, mode: 'menu' | 'stock') => client.post(`/didi/${slug}/grocery/trigger`, { mode }).then(r => r.data),
   listUploads: (slug: string) => client.get(`/didi/${slug}/grocery/uploads`).then(r => r.data),
   checkTasks: (slug: string, uploadId: string) => client.post(`/didi/${slug}/grocery/uploads/${uploadId}/check-tasks`, {}).then(r => r.data),
+};
+
+export const inventoryActivityApi = {
+  list: (params: InventoryActivityFilters) =>
+    client.get('/inventory/activity', { params }).then(r => r.data),
+  get: (id: string) =>
+    client.get(`/inventory/activity/${id}`).then(r => r.data),
 };
 
 export const accountsApi = {
