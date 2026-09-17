@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  Allow,
   ArrayNotEmpty,
   Equals,
   IsArray,
@@ -10,7 +11,6 @@ import {
   IsNumber,
   IsPositive,
   IsString,
-  Matches,
   MaxLength,
   Min,
   ValidateNested,
@@ -30,10 +30,9 @@ export class InventoryRecordDto {
   @IsNotEmpty()
   store_id: string;
 
-  @IsString()
-  @Matches(/^\d+$/)
-  @MaxLength(14)
-  ean: string;
+  // Keep invalid values so the service can skip those records individually.
+  @Allow()
+  ean: unknown;
 
   @IsString()
   @IsNotEmpty()

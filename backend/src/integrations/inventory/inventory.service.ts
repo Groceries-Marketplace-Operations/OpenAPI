@@ -13,6 +13,9 @@ import {
 } from './ninety-nine-food.client';
 
 const MAX_ITEMS_PER_CATEGORY = 3_000;
+const VALID_EAN = /^[A-Za-z0-9]{1,14}$/;
+
+type InventoryRecordWithEan = InventoryRecordDto & { ean: string };
 
 export interface InventoryReceipt {
   job_id: string;
@@ -32,7 +35,19 @@ export class InventoryService {
   async receive(payload: ReceiveInventoryDto): Promise<InventoryReceipt> {
     const jobId = this.audit.getRequestId() ?? randomUUID();
     const createdAt = new Date().toISOString();
-    const recordsByStore = this.groupByStore(payload.records);
+    const validRecords = payload.records.filter(
+      (record): record is InventoryRecordWithEan =>
+        typeof record.ean === 'string' && VALID_EAN.test(record.ean),
+    );
+    const skippedCount = payload.records.length - validRecords.length;
+    if (skippedCount > 0) {
+      this.logger.warn(`Inventory job ${jobId}: skipped ${skippedCount} records with invalid ean`);
+    }
+    if (validRecords.length === 0) {
+      throw new BadRequestException('No records with a valid ean to process');
+    }
+
+    const recordsByStore = this.groupByStore(validRecords);
 
     for (const [storeId, records] of recordsByStore) {
       this.validateStoreRecords(storeId, records);
@@ -61,8 +76,8 @@ export class InventoryService {
     };
   }
 
-  private groupByStore(records: InventoryRecordDto[]): Map<string, InventoryRecordDto[]> {
-    const grouped = new Map<string, InventoryRecordDto[]>();
+  private groupByStore(records: InventoryRecordWithEan[]): Map<string, InventoryRecordWithEan[]> {
+    const grouped = new Map<string, InventoryRecordWithEan[]>();
 
     for (const record of records) {
       const storeRecords = grouped.get(record.store_id) ?? [];
@@ -73,7 +88,7 @@ export class InventoryService {
     return grouped;
   }
 
-  private validateStoreRecords(storeId: string, records: InventoryRecordDto[]): void {
+  private validateStoreRecords(storeId: string, records: InventoryRecordWithEan[]): void {
     if (records.length > 30_000) {
       throw new BadRequestException(`Store ${storeId} exceeds the 99Food limit of 30000 items`);
     }
@@ -103,7 +118,7 @@ export class InventoryService {
     }
   }
 
-  private toNinetyNineItem(record: InventoryRecordDto): NinetyNineGroceryItem {
+  private toNinetyNineItem(record: InventoryRecordWithEan): NinetyNineGroceryItem {
     const item: NinetyNineGroceryItem = {
       app_item_id: record.id,
       upc: record.ean,
