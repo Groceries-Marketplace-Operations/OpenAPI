@@ -10,7 +10,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Public } from '../../auth/decorators/public.decorator';
-import { Roles } from '../../auth/decorators/roles.decorator';
 import { InventoryActivityQueryDto } from './dto/inventory-activity-query.dto';
 import { ReceiveInventoryDto } from './dto/receive-inventory.dto';
 import { InventoryApiKeyGuard } from './inventory-api-key.guard';
@@ -25,13 +24,11 @@ export class InventoryController {
   ) {}
 
   @Get('activity')
-  @Roles('admin')
   findActivity(@Query() query: InventoryActivityQueryDto) {
     return this.audit.findActivity(query);
   }
 
   @Get('activity/:id')
-  @Roles('admin')
   findActivityById(@Param('id') id: string) {
     return this.audit.findActivityById(id);
   }

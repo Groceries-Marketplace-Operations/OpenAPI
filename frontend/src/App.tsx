@@ -27,7 +27,7 @@ export default function App() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/" element={<Protected><ProjectsPage /></Protected>} />
       <Route path="/projects/:id" element={<Protected><ProjectDetail /></Protected>} />
-      <Route path="/inventory-activity" element={<Protected adminOnly><InventoryActivityPage /></Protected>} />
+      <Route path="/inventory-activity" element={<Protected><InventoryActivityPage /></Protected>} />
     </Routes>
   );
 }

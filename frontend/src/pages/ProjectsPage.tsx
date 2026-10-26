@@ -28,11 +28,9 @@ export default function ProjectsPage() {
         <h1 style={{ fontSize: 24, fontWeight: 700 }}>OpenAPI</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <span style={{ fontSize: 14, color: '#666' }}>{user?.email}</span>
-          {isAdmin && (
-            <Link to="/inventory-activity" style={{ ...btnStyle, background: '#fff', color: '#333', border: '1px solid #ddd', textDecoration: 'none' }}>
-              Inventory Activity
-            </Link>
-          )}
+          <Link to="/inventory-activity" style={{ ...btnStyle, background: '#fff', color: '#333', border: '1px solid #ddd', textDecoration: 'none' }}>
+            Inventory Activity
+          </Link>
           {isAdmin && <button onClick={() => setCreating(true)} style={btnStyle}>+ New Project</button>}
           <button onClick={logout} style={{ ...btnStyle, background: '#fff', color: '#333', border: '1px solid #ddd' }}>Logout</button>
         </div>
