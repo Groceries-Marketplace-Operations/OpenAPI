@@ -12,7 +12,8 @@ export default function ProjectDetail() {
   const qc = useQueryClient();
   const { data: project } = useQuery<PD>({ queryKey: ['project', id], queryFn: () => projectsApi.get(id!) });
   const [showConfig, setShowConfig] = useState(false);
-  const [cfg, setCfg] = useState({ appId: '', appSecret: '' });
+  const [cfg, setCfg] = useState({ appId: '', appSecret: '', testAppId: '', testAppSecret: '' });
+  const [configError, setConfigError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const [showGrocery, setShowGrocery] = useState(false);
@@ -39,11 +40,14 @@ export default function ProjectDetail() {
   const saveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setConfigError('');
     try {
       await projectsApi.upsertDiDiConfig(id!, cfg);
       qc.invalidateQueries({ queryKey: ['project', id] });
       setShowConfig(false);
-      setCfg({ appId: '', appSecret: '' });
+      setCfg({ appId: '', appSecret: '', testAppId: '', testAppSecret: '' });
+    } catch (err: any) {
+      setConfigError(err?.response?.data?.message ?? err.message ?? 'Unable to save');
     } finally { setSaving(false); }
   };
 
@@ -101,7 +105,11 @@ export default function ProjectDetail() {
             <button onClick={openTestPanel} style={ghostBtn}>
               Test Mode {project.diDiConfig?.testModeEnabled ? '🟢' : '⚪'}
             </button>
-            <button onClick={() => setShowConfig(v => !v)} style={btnStyle}>
+            <button onClick={() => {
+              setCfg({ appId: project.diDiConfig?.appId ?? '', appSecret: '', testAppId: project.diDiConfig?.testAppId ?? '', testAppSecret: '' });
+              setConfigError('');
+              setShowConfig(v => !v);
+            }} style={btnStyle}>
               {project.diDiConfig ? 'Edit DiDi Config' : 'Set DiDi Config'}
             </button>
           </div>
@@ -113,8 +121,16 @@ export default function ProjectDetail() {
         <form onSubmit={saveConfig} style={cardStyle}>
           <h3 style={{ marginBottom: 16 }}>DiDi Configuration</h3>
           <div style={{ display: 'grid', gap: 12 }}>
-            <input placeholder="App ID" required value={cfg.appId} onChange={e => setCfg(p => ({ ...p, appId: e.target.value }))} style={inputStyle} />
-            <input placeholder="App Secret" required value={cfg.appSecret} onChange={e => setCfg(p => ({ ...p, appSecret: e.target.value }))} style={inputStyle} />
+            <strong>Production</strong>
+            <input aria-label="Production App ID" placeholder="Production App ID" required value={cfg.appId} onChange={e => setCfg(p => ({ ...p, appId: e.target.value }))} style={inputStyle} />
+            <input aria-label="Production App Secret" type="password" autoComplete="new-password" placeholder="Production App Secret (blank keeps current)" required={!project.diDiConfig || cfg.appId !== project.diDiConfig.appId} value={cfg.appSecret} onChange={e => setCfg(p => ({ ...p, appSecret: e.target.value }))} style={inputStyle} />
+          </div>
+          <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+            <strong>Test</strong>
+            <input aria-label="Test App ID" placeholder="Test App ID" value={cfg.testAppId} onChange={e => setCfg(p => ({ ...p, testAppId: e.target.value }))} style={inputStyle} />
+            <input aria-label="Test App Secret" type="password" autoComplete="new-password" placeholder="Test App Secret (blank keeps current)" required={!!cfg.testAppId && cfg.testAppId !== project.diDiConfig?.testAppId} value={cfg.testAppSecret} onChange={e => setCfg(p => ({ ...p, testAppSecret: e.target.value }))} style={inputStyle} />
+            <span style={{ color: '#555', fontSize: 13 }}>Both environments use the same endpoints, with different App IDs and secrets. Test requests require Test Mode and an allowed test shop. Production orders are confirmed automatically.</span>
+            {configError && <div role="alert" style={{ color: '#c62828' }}>{configError}</div>}
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
             <button type="submit" disabled={saving} style={btnStyle}>{saving ? 'Saving…' : 'Save'}</button>
@@ -246,7 +262,7 @@ export default function ProjectDetail() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #eee' }}>
-                    {['Date', 'Shop', 'Index', 'Order ID', 'Confirmed', 'Error'].map(h => (
+                    {['Environment', 'Date', 'Shop', 'Index', 'Order ID', 'Confirmed', 'Error'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '6px 8px', color: '#888', fontWeight: 500 }}>{h}</th>
                     ))}
                   </tr>
@@ -254,6 +270,7 @@ export default function ProjectDetail() {
                 <tbody>
                   {project.orderEvents.map(ev => (
                     <tr key={ev.id} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                      <td style={td}>{ev.environment}</td>
                       <td style={td}>{ev.date}</td>
                       <td style={td}>{ev.appShopId}</td>
                       <td style={td}>{ev.orderIndex}</td>

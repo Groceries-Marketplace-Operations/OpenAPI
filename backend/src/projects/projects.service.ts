@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { encrypt, decrypt } from '../common/crypto.util';
@@ -15,7 +15,7 @@ export class ProjectsService {
 
   findAll() {
     return this.prisma.project.findMany({
-      include: { diDiConfig: { select: { id: true, appId: true, updatedAt: true } } },
+      include: { diDiConfig: { select: { id: true, appId: true, testAppId: true, updatedAt: true } } },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -24,7 +24,7 @@ export class ProjectsService {
     return this.prisma.project.findUnique({
       where: { id },
       include: {
-        diDiConfig: { select: { id: true, appId: true, testModeEnabled: true, testShops: true, updatedAt: true } },
+        diDiConfig: { select: { id: true, appId: true, testAppId: true, testModeEnabled: true, testShops: true, updatedAt: true } },
         orderEvents: { orderBy: { createdAt: 'desc' }, take: 100 },
       },
     });
@@ -39,23 +39,38 @@ export class ProjectsService {
   }
 
   async upsertDiDiConfig(projectId: string, dto: UpsertDiDiConfigDto) {
-    const appSecret = this.encKey ? encrypt(dto.appSecret, this.encKey) : dto.appSecret;
-    const extra = {
-      testModeEnabled: dto.testModeEnabled ?? false,
-      testShops: dto.testShops ?? [],
+    const existing = await this.prisma.diDiConfig.findUnique({ where: { projectId } });
+    const appId = dto.appId.trim();
+    const testAppId = dto.testAppId?.trim() ?? existing?.testAppId ?? null;
+    if (!appId) throw new BadRequestException('Production App ID is required');
+    if (testAppId === appId) throw new BadRequestException('Test and production App IDs must differ');
+    if ((!existing || existing.appId !== appId) && !dto.appSecret) {
+      throw new BadRequestException('Production App Secret is required for a new App ID');
+    }
+    if (testAppId && (!existing?.testAppSecret || existing.testAppId !== testAppId) && !dto.testAppSecret) {
+      throw new BadRequestException('Test App Secret is required for a new App ID');
+    }
+    if (!testAppId && dto.testAppSecret) throw new BadRequestException('Test App ID is required');
+    const encode = (secret: string) => this.encKey ? encrypt(secret, this.encKey) : secret;
+    const data = {
+      appId,
+      appSecret: dto.appSecret ? encode(dto.appSecret) : existing!.appSecret,
+      testAppId: testAppId || null,
+      testAppSecret: testAppId ? (dto.testAppSecret ? encode(dto.testAppSecret) : existing?.testAppSecret) : null,
+      testModeEnabled: dto.testModeEnabled ?? existing?.testModeEnabled ?? false,
+      testShops: dto.testShops ?? existing?.testShops ?? [],
     };
-    return this.prisma.diDiConfig.upsert({
-      where: { projectId },
-      create: { projectId, appId: dto.appId, appSecret, ...extra },
-      update: { appId: dto.appId, appSecret, ...extra },
+    await this.prisma.diDiConfig.upsert({
+      where: { projectId }, create: { projectId, ...data }, update: data,
     });
+    return { success: true };
   }
 
   async updateTestMode(projectId: string, testModeEnabled: boolean, testShops: string[]) {
-    return this.prisma.diDiConfig.update({
-      where: { projectId },
-      data: { testModeEnabled, testShops },
+    await this.prisma.diDiConfig.update({
+      where: { projectId }, data: { testModeEnabled, testShops },
     });
+    return { success: true };
   }
 
   async getDiDiConfig(projectId: string) {
@@ -63,6 +78,7 @@ export class ProjectsService {
     if (!cfg) return null;
     return {
       ...cfg,
+      testAppSecret: cfg.testAppSecret && this.encKey ? decrypt(cfg.testAppSecret, this.encKey) : cfg.testAppSecret,
       appSecret: this.encKey ? decrypt(cfg.appSecret, this.encKey) : cfg.appSecret,
     };
   }
