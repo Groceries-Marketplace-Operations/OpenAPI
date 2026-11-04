@@ -13,6 +13,20 @@ export class DiDiFoodService {
 
   constructor(private prisma: PrismaService, private projects: ProjectsService) {}
 
+  private selectCredentials(cfg: NonNullable<Awaited<ReturnType<ProjectsService['getDiDiConfig']>>>, appId: string) {
+    if (appId === cfg.appId) return { appId, appSecret: cfg.appSecret, environment: 'production' };
+    if (appId === cfg.testAppId && cfg.testAppSecret) {
+      return { appId, appSecret: cfg.testAppSecret, environment: 'test' };
+    }
+    throw new UnauthorizedException('Invalid app_id');
+  }
+
+  private validateTestAccess(cfg: { testModeEnabled: boolean; testShops: string[] }, environment: string, shop: string) {
+    if (environment === 'test' && (!cfg.testModeEnabled || !cfg.testShops.includes(shop))) {
+      throw new ForbiddenException('Test mode must be enabled and the shop must be allowed');
+    }
+  }
+
   async handleWebhook(slug: string, rawBody: string, signature: string) {
     const project = await this.prisma.project.findUnique({ where: { slug } });
     if (!project?.active) throw new NotFoundException('Project not found');
@@ -20,21 +34,23 @@ export class DiDiFoodService {
     const cfg = await this.projects.getDiDiConfig(project.id);
     if (!cfg) throw new NotFoundException('DiDi config not set');
 
-    if (!verifyWebhookSignature(rawBody, signature, cfg.appSecret)) {
+    let payload: any;
+    let body: any;
+    try {
+      payload = JSON.parse(rawBody);
+      body = payload.PARAM
+        ? (typeof payload.PARAM === 'string' ? JSON.parse(payload.PARAM) : payload.PARAM)
+        : payload;
+      if (!body || typeof body !== 'object') throw new Error();
+    } catch { throw new BadRequestException('Invalid JSON'); }
+    const source = typeof payload.PARAM === 'string' ? payload.PARAM : rawBody;
+    const appIdMatch = source.match(/"app_id"\s*:\s*(\d+)/);
+    const incomingAppId = appIdMatch ? appIdMatch[1] : String(body.app_id);
+    const credentials = this.selectCredentials(cfg, incomingAppId);
+    if (!verifyWebhookSignature(rawBody, signature, credentials.appSecret)) {
       throw new UnauthorizedException('Invalid signature');
     }
-
-    let payload: any;
-    try { payload = JSON.parse(rawBody); } catch { throw new BadRequestException('Invalid JSON'); }
-
-    const body = payload.PARAM
-      ? (typeof payload.PARAM === 'string' ? JSON.parse(payload.PARAM) : payload.PARAM)
-      : payload;
-
-    // Validate app_id without precision loss
-    const appIdMatch = rawBody.match(/"app_id"\s*:\s*(\d+)/);
-    const incomingAppId = appIdMatch ? appIdMatch[1] : String(body.app_id);
-    if (incomingAppId !== String(cfg.appId)) throw new UnauthorizedException('app_id mismatch');
+    this.validateTestAccess(cfg, credentials.environment, String(body.app_shop_id));
 
     if (body.type !== 'orderNew') return { ignored: true };
 
@@ -58,33 +74,33 @@ export class DiDiFoodService {
 
     // Upsert (idempotent)
     await this.prisma.diDiOrderEvent.upsert({
-      where: { projectId_appShopId_date_orderIndex: { projectId: project.id, appShopId: String(app_shop_id), date, orderIndex } },
-      create: { projectId: project.id, appShopId: String(app_shop_id), orderId, orderIndex, date, timestamp: BigInt(timestamp) },
+      where: { projectId_environment_appShopId_date_orderIndex: { projectId: project.id, environment: credentials.environment, appShopId: String(app_shop_id), date, orderIndex } },
+      create: { projectId: project.id, environment: credentials.environment, appShopId: String(app_shop_id), orderId, orderIndex, date, timestamp: BigInt(timestamp) },
       update: {},
     });
 
     this.logger.log(`Stored order ${orderId} index ${orderIndex} shop ${app_shop_id}`);
 
     // Confirm order (async, don't block response)
-    this.confirmOrderAsync(project.id, cfg.appId, cfg.appSecret, String(app_shop_id), orderId).catch(() => {});
+    this.confirmOrderAsync(project.id, credentials.environment, credentials.appId, credentials.appSecret, String(app_shop_id), orderId).catch(() => {});
 
     return { success: true };
   }
 
-  private async confirmOrderAsync(projectId: string, appId: string, appSecret: string, appShopId: string, orderId: string) {
+  private async confirmOrderAsync(projectId: string, environment: string, appId: string, appSecret: string, appShopId: string, orderId: string) {
     try {
       await refreshAuthToken(appId, appSecret, appShopId);
       const token = await getAuthToken(appId, appSecret, appShopId);
       await confirmOrder(token, orderId);
       await this.prisma.diDiOrderEvent.updateMany({
-        where: { projectId, orderId },
+        where: { projectId, environment, appShopId, orderId },
         data: { confirmed: true, confirmError: null },
       });
     } catch (err) {
       const msg = (err as Error).message;
       this.logger.error(`Confirm failed for order ${orderId}: ${msg}`);
       await this.prisma.diDiOrderEvent.updateMany({
-        where: { projectId, orderId },
+        where: { projectId, environment, appShopId, orderId },
         data: { confirmed: false, confirmError: msg },
       });
     }
@@ -96,6 +112,7 @@ export class DiDiFoodService {
 
     const cfg = await this.projects.getDiDiConfig(project.id);
     if (!cfg) throw new NotFoundException('DiDi config not set');
+    if (!cfg.testAppId || !cfg.testAppSecret) throw new ForbiddenException('Test credentials are not configured');
     if (!cfg.testModeEnabled) throw new ForbiddenException('Test mode is disabled for this project');
     if (!cfg.testShops.includes(appShopId)) {
       throw new ForbiddenException(`Shop ${appShopId} is not in the allowed test shops list`);
@@ -112,7 +129,7 @@ export class DiDiFoodService {
 
     try {
       await this.prisma.diDiOrderEvent.create({
-        data: { projectId: project.id, appShopId, orderId, orderIndex, date: targetDate, timestamp: BigInt(timestamp), confirmed: true },
+        data: { projectId: project.id, environment: 'test', appShopId, orderId, orderIndex, date: targetDate, timestamp: BigInt(timestamp), confirmed: true },
       });
     } catch (err: any) {
       if (err.code === 'P2002') throw new ConflictException('An order with this shop/date/order_index already exists');
@@ -132,19 +149,20 @@ export class DiDiFoodService {
 
     const { 'x-app-id': appId, 'x-timestamp': timestamp, 'x-signature': signature } = headers;
     if (!appId || !timestamp || !signature) throw new UnauthorizedException('Missing auth headers');
-    if (appId !== cfg.appId) throw new UnauthorizedException('Invalid app_id');
+    const credentials = this.selectCredentials(cfg, appId);
+    this.validateTestAccess(cfg, credentials.environment, appShopId);
 
     const now = Math.floor(Date.now() / 1000);
-    if (Math.abs(now - Number(timestamp)) > 300) throw new UnauthorizedException('Timestamp expired');
+    if (!Number.isFinite(Number(timestamp)) || Math.abs(now - Number(timestamp)) > 300) throw new UnauthorizedException('Timestamp expired');
 
-    if (!verifyQuerySignature(appId, timestamp, signature, cfg.appSecret)) {
+    if (!verifyQuerySignature(appId, timestamp, signature, credentials.appSecret)) {
       throw new UnauthorizedException('Invalid signature');
     }
 
     const targetDate = date ?? new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 
     const event = await this.prisma.diDiOrderEvent.findUnique({
-      where: { projectId_appShopId_date_orderIndex: { projectId: project.id, appShopId, date: targetDate, orderIndex } },
+      where: { projectId_environment_appShopId_date_orderIndex: { projectId: project.id, environment: credentials.environment, appShopId, date: targetDate, orderIndex } },
     });
 
     if (!event) throw new NotFoundException(`Order not found for shop ${appShopId} index ${orderIndex} on ${targetDate}`);

@@ -44,6 +44,8 @@ model DiDiConfig {
   projectId       String   @unique @map("project_id")
   appId           String   @map("app_id")
   appSecret       String   @map("app_secret")
+  testAppId       String?  @map("test_app_id")
+  testAppSecret   String?  @map("test_app_secret")
   testModeEnabled Boolean  @default(false) @map("test_mode_enabled")
   testShops       String[] @map("test_shops")
   createdAt       DateTime @default(now()) @map("created_at")
@@ -99,6 +101,7 @@ model DiDiGroceryUploadStore {
 
 model DiDiOrderEvent {
   id           String   @id @default(uuid())
+  environment  String   @default("production")
   projectId    String   @map("project_id")
   appShopId    String   @map("app_shop_id")
   orderId      String   @map("order_id")
@@ -109,7 +112,7 @@ model DiDiOrderEvent {
   confirmError String?  @map("confirm_error")
   createdAt    DateTime @default(now()) @map("created_at")
   project      Project  @relation(fields: [projectId], references: [id])
-  @@unique([projectId, appShopId, date, orderIndex])
+  @@unique([projectId, environment, appShopId, date, orderIndex], map: "didi_order_event_environment_key")
   @@map("didi_order_event")
 }
 

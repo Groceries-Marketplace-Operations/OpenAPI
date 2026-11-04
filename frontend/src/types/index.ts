@@ -11,10 +11,11 @@ export interface Project {
   description: string | null;
   active: boolean;
   createdAt: string;
-  diDiConfig: { id: string; appId: string; testModeEnabled: boolean; testShops: string[]; updatedAt: string } | null;
+  diDiConfig: { id: string; appId: string; testAppId: string | null; testModeEnabled: boolean; testShops: string[]; updatedAt: string } | null;
 }
 
 export interface DiDiOrderEvent {
+  environment: 'production' | 'test';
   id: string;
   appShopId: string;
   orderId: string;
